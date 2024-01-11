@@ -238,7 +238,7 @@ async fn confirm_trade_interactive(wallet: &Wallet,
     token_id.copy_from_slice(&hex::decode(&token.id)?);
     let receiving_address = wallet.address().clone();
     let cancel_address = wallet.address().clone();
-    let signal_address_str = "ergon:qz79ga40fgzw0zuvzhtjqd5pyzhm5ah7vvepv2l4u4";
+    let signal_address_str = "ergon:qpu3n8vgkkhkga2hcqgv29mlzq6aeauxss42y7md8q";
     let signal_address = Address::from_cash_addr(signal_address_str.to_string())
         .expect("Invalid address"); // Handle this error appropriately
     let (temp_address, temp_secret_key) = wallet.get_new_address()?;
