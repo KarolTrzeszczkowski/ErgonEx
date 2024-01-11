@@ -15,7 +15,7 @@ pub mod trade;
 pub mod display_qr;
 
 use std::io::{self, Write, Read};
-use text_io::{read, try_read, try_scan};
+use text_io::{read};
 use std::env;
 
 
@@ -23,7 +23,7 @@ const WALLET_FILE_NAME: &str = "trade.dat";
 const SLP_AGORA_PATH: &str = ".slpagora";
 
 
-fn ensure_wallet_interactive() -> Result<wallet::Wallet, Box<std::error::Error>> {
+fn ensure_wallet_interactive() -> Result<wallet::Wallet, Box<dyn std::error::Error>> {
     let trades_dir = dirs::home_dir().unwrap_or(env::current_dir()?).join(SLP_AGORA_PATH);
     let wallet_file_path = trades_dir.as_path().join(WALLET_FILE_NAME);
     std::fs::create_dir_all(trades_dir)?;
@@ -48,23 +48,26 @@ fn ensure_wallet_interactive() -> Result<wallet::Wallet, Box<std::error::Error>>
     }
 }
 
-fn show_balance(w: &wallet::Wallet) {
-    let balance = w.get_balance();
-    println!("Your wallet's balance is: {} sats or {} BCH.",
+async fn show_balance(w: &wallet::Wallet) -> Result<(), Box<dyn std::error::Error>> {
+    let balance = w.get_balance().await?;
+    
+    println!("Your wallet's balance is: {} ergoshis or {} XRG.",
              balance,
              balance as f64 / 100_000_000.0);
     println!("Your wallet's address is: {}", w.address().cash_addr());
     display_qr::display(w.address().cash_addr().as_bytes());
+
+    Ok(())
 }
 
-fn do_transaction(w: &wallet::Wallet) -> Result<(), Box<std::error::Error>> {
-    let (mut tx_build, balance) = w.init_transaction();
-    println!("Your wallet's balance is: {} sats or {} BCH.",
+async fn do_transaction(w: &wallet::Wallet) -> Result<(), Box<dyn std::error::Error>> {
+    let (mut tx_build, balance) = w.init_transaction(None, None).await?;
+    println!("Your wallet's balance is: {} ergoshis or {} XRG.",
              balance,
              balance as f64 / 100_000_000.0);
     if balance < w.dust_amount() {
         println!("Your balance ({}) isn't sufficient to broadcast a transaction. Please fund some \
-                  BCH to your wallet's address: {}", balance, w.address().cash_addr());
+                  XRG to your wallet's address: {}", balance, w.address().cash_addr());
         return Ok(());
     }
     print!("Enter the address to send to: ");
@@ -80,9 +83,9 @@ fn do_transaction(w: &wallet::Wallet) -> Result<(), Box<std::error::Error>> {
     };
     if receiving_addr.prefix() == "simpleledger" {
         println!("Note: You entered a Simple Ledger Protocol (SLP) address, but this wallet only \
-                  contains ordinary non-token BCH. The program will proceed anyways.");
+                  contains ordinary non-token XRG. The program will proceed anyways.");
     }
-    print!("Enter the amount in satoshis to send, or \"all\" (without quotes) to send the entire \
+    print!("Enter the amount in ergoshis to send, or \"all\" (without quotes) to send the entire \
             balance: ");
     io::stdout().flush()?;
     let send_amount_str: String = read!("{}\n");
@@ -117,13 +120,14 @@ fn do_transaction(w: &wallet::Wallet) -> Result<(), Box<std::error::Error>> {
         tx_build.replace_output(back_to_wallet_idx, &output_back_to_wallet);
     }
     let tx = tx_build.sign();
-    let response = w.send_tx(&tx)?;
+    let response = w.send_tx(&tx).await?; // Use await here
     println!("Sent transaction. Transaction ID is: {}", response);
 
     Ok(())
 }
 
-fn main() -> Result<(), Box<std::error::Error>> {
+#[tokio::main] // Make sure to use the async runtime
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let wallet = ensure_wallet_interactive()?;
     println!("Your wallet address is: {}", wallet.address().cash_addr());
 
@@ -131,18 +135,24 @@ fn main() -> Result<(), Box<std::error::Error>> {
         println!("---------------------------------");
         println!("Select an option from below:");
         println!("1: Show wallet balance / fund wallet");
-        println!("2: Send BCH from this wallet to an address");
-        println!("3: Create a new trade for a token on the BCH blockchain");
-        println!("4: List all available token trades on the BCH blockchain");
+        println!("2: Send XRG from this wallet to an address");
+        println!("3: Create a new trade for a token on the Ergon blockchain");
+        println!("4: List all available token trades on the Ergon blockchain");
+        println!("5: List trades for a specific token symbol");
         println!("Anything else: Exit");
         print!("Your choice: ");
         io::stdout().flush()?;
         let choice: String = read!("{}\n");
         match choice.trim() {
-            "1" => show_balance(&wallet),
-            "2" => do_transaction(&wallet)?,
-            "3" => trade::create_trade_interactive(&wallet)?,
-            "4" => trade::accept_trades_interactive(&wallet)?,
+            "1" => show_balance(&wallet).await?,
+            "2" => do_transaction(&wallet).await?,
+            "3" => trade::create_trade_interactive(&wallet).await?,
+            "4" => trade::accept_trades_interactive(&wallet, None).await?,
+            "5" => {
+                println!("Enter the token symbol to filter trades: ");
+                let token_symbol: String = read!("{}\n");
+                trade::accept_trades_interactive(&wallet, Some(token_symbol)).await?;
+            },
             _ => {
                 println!("Bye, have a great time!");
                 return Ok(());

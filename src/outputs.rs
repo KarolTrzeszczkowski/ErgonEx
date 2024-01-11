@@ -54,6 +54,9 @@ pub struct EnforceOutputsOutput {
     pub is_cancel: Option<bool>, // None if just generating P2SH
 }
 
+
+
+
 impl Output for P2PKHOutput {
     fn value(&self) -> u64 {
         self.value

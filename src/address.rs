@@ -1,5 +1,5 @@
 const CHARSET: &'static [u8] = b"qpzry9x8gf2tvdw0s3jn54khce6mua7l";
-const DEFAULT_PREFIX: &'static str = "bitcoincash";
+const DEFAULT_PREFIX: &'static str = "ergon";
 
 #[derive(Clone, Debug)]
 pub enum AddressError {

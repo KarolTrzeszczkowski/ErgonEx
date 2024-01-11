@@ -1,6 +1,9 @@
 use crate::script::{Op, OpCodeType};
 use crate::hash::{single_sha256, double_sha256};
-use secp256k1::{Secp256k1, All, PublicKey, Signature, Message};
+use secp256k1::ecdsa::{Signature};
+use secp256k1::{Secp256k1, Message, All};
+use secp256k1::PublicKey;
+
 
 pub struct ScriptInterpreter {
     stack: Vec<Vec<u8>>,
@@ -20,7 +23,7 @@ impl ScriptInterpreter {
     pub fn new(pre_image_serialized: Vec<u8>) -> Self {
         ScriptInterpreter {
             stack: Vec::new(),
-            curve: Secp256k1::new(),
+            curve: Secp256k1::new(),  // This is already correct
             pre_image_serialized,
         }
     }
@@ -83,9 +86,9 @@ impl ScriptInterpreter {
                 sig_ser.remove(sig_ser.len() - 1);
                 let sig = Signature::from_der(&sig_ser)
                     .map_err(|_| InvalidSignatureFormat)?;
-                let msg = Message::from_slice(&double_sha256(&self.pre_image_serialized))
+                let msg = Message::from_digest_slice(&double_sha256(&self.pre_image_serialized))
                     .expect("Invalid message (this is a bug)");
-                self.curve.verify(&msg, &sig, &pub_key).map_err(|_| InvalidSignature)?;
+                self.curve.verify_ecdsa(&msg, &sig, &pub_key).map_err(|_| InvalidSignature)?;
             },
             OpRot => {
                 let third = self.stack.remove(self.stack.len() - 3);
@@ -95,12 +98,12 @@ impl ScriptInterpreter {
                 let pub_key = PublicKey::from_slice(
                     &self.stack.remove(self.stack.len() - 1)
                 ).map_err(|_| InvalidPubKey)?;
-                let msg = Message::from_slice(
+                let msg = Message::from_digest_slice(
                     &single_sha256(&self.stack.remove(self.stack.len() - 1))
                 ).expect("Invalid message (this is a bug)");
                 let sig = Signature::from_der(&self.stack.remove(self.stack.len() - 1))
                     .map_err(|_| InvalidSignatureFormat)?;
-                if let Ok(_) = self.curve.verify(&msg, &sig, &pub_key) {
+                if self.curve.verify_ecdsa(&msg, &sig, &pub_key).is_ok() {
                     self.stack.push(vec![1])
                 } else {
                     println!("Note: OP_CHECKDATASIG failed");

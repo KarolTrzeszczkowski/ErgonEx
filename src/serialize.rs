@@ -4,12 +4,12 @@ use byteorder::{LittleEndian, WriteBytesExt, ReadBytesExt};
 
 pub fn write_var_int<W: io::Write>(write: &mut W, number: u64) -> io::Result<()> {
     match number {
-        0 ... 0xfc        => write.write_u8(number as u8)?,
-        0 ... 0xffff      => {
+        0 ..= 0xfc        => write.write_u8(number as u8)?,
+        0 ..= 0xffff      => {
             write.write(b"\xfd")?;
             write.write_u16::<LittleEndian>(number as u16)?
         },
-        0 ... 0xffff_ffff => {
+        0 ..= 0xffff_ffff => {
             write.write(b"\xfe")?;
             write.write_u32::<LittleEndian>(number as u32)?
         },
@@ -30,7 +30,7 @@ pub fn write_var_str<W: io::Write>(write: &mut W, string: &[u8]) -> io::Result<(
 pub fn read_var_int<R: io::Read>(read: &mut R) -> io::Result<u64> {
     let first_byte = read.read_u8()?;
     match first_byte {
-        0 ... 0xfc => Ok(first_byte as u64),
+        0 ..= 0xfc => Ok(first_byte as u64),
         0xfd       => Ok(read.read_u16::<LittleEndian>()? as u64),
         0xfe       => Ok(read.read_u32::<LittleEndian>()? as u64),
         0xff       => Ok(read.read_u64::<LittleEndian>()? as u64),

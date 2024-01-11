@@ -15,10 +15,10 @@ impl Op {
         match self {
             Op::Push(vec) => {
                 match vec.len() {
-                    0 ... 0x4b        => vec.len() as u8,
-                    0 ... 0xff        => 0x4c,
-                    0 ... 0xffff      => 0x4d,
-                    0 ... 0xffff_ffff => 0x4e,
+                    0 ..= 0x4b        => vec.len() as u8,
+                    0 ..= 0xff        => 0x4c,
+                    0 ..= 0xffff      => 0x4d,
+                    0 ..= 0xffff_ffff => 0x4e,
                     _                 => unimplemented!(),
                 }
             },
@@ -33,10 +33,10 @@ impl Op {
                 1 if is_minimal_push && vec[0] > 0 && vec[0] <= 16 => {
                     return write.write_u8(vec[0] + 0x50)
                 },
-                0 ... 0x4b => {},
-                len @ (0 ... 0xff) => { write.write_u8(len as u8)? },
-                len @ (0 ... 0xffff) => { write.write_u16::<LittleEndian>(len as u16)? },
-                len @ (0 ... 0xffff_ffff) => { write.write_u32::<LittleEndian>(len as u32)? },
+                0 ..= 0x4b => {},
+                len @ (0 ..= 0xff) => { write.write_u8(len as u8)? },
+                len @ (0 ..= 0xffff) => { write.write_u16::<LittleEndian>(len as u16)? },
+                len @ (0 ..= 0xffff_ffff) => { write.write_u32::<LittleEndian>(len as u32)? },
                 _ => {},
             };
             write.write(vec)?;
@@ -81,7 +81,7 @@ impl Script {
         let mut idx = 0;
         while idx < data.len() {
             match data[idx] {
-                n_bytes @ (0 ... 0x4b) => {
+                n_bytes @ (0 ..= 0x4b) => {
                     let n_bytes = n_bytes as usize;
                     ops.push(Op::Push(data[idx + 1..idx + 1 + n_bytes].to_vec()));
                     idx += n_bytes;

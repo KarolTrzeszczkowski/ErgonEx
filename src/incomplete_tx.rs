@@ -4,9 +4,14 @@ use crate::hash::{double_sha256};
 use crate::serialize::write_var_int;
 
 use std::io::Write;
-
 use byteorder::{LittleEndian, WriteBytesExt};
-use secp256k1::{Secp256k1, PublicKey, SecretKey, Message};
+use secp256k1::{Secp256k1, Message, SecretKey};
+use secp256k1::PublicKey;
+
+
+
+
+
 
 pub trait Output {
     fn value(&self) -> u64;
@@ -121,39 +126,31 @@ impl IncompleteTx {
         }
         pre_images
     }
-
     pub fn sign(&self) -> Tx {
-        let secp = Secp256k1::new();  // TODO: setup beforehand
+        let secp = Secp256k1::new();
         let sighash_type: u32 = 0x41;
         let mut tx_inputs = Vec::with_capacity(self.inputs.len());
+    
         for (input, pre_image) in self.inputs.iter().zip(self.pre_images(sighash_type)) {
-//            let mut pre_image = Vec::new();
-//            pre_image.write_i32::<LittleEndian>(self.version).unwrap();
-//            pre_image.write(&hash_prevouts).unwrap();
-//            pre_image.write(&hash_sequence).unwrap();
-//            pre_image.write(&input.outpoint.tx_hash).unwrap();
-//            pre_image.write_u32::<LittleEndian>(input.outpoint.output_idx).unwrap();
-//            let script = input.output.script_code().to_vec();
-//            println!("{}", input.output.script_code());
-//            write_var_int(&mut pre_image, script.len() as u64).unwrap();
-//            pre_image.write(&script).unwrap();
-//            pre_image.write_u64::<LittleEndian>(input.output.value()).unwrap();
-//            pre_image.write_u32::<LittleEndian>(input.sequence).unwrap();
-//            pre_image.write(&hash_outputs).unwrap();
-//            pre_image.write_u32::<LittleEndian>(self.lock_time).unwrap();
-//            pre_image.write_u32::<LittleEndian>(sighash_type).unwrap();
             let mut pre_image_serialized = Vec::new();
             pre_image.write_to_stream(&mut pre_image_serialized).unwrap();
-            let message = Message::from_slice(&double_sha256(&pre_image_serialized)).unwrap();
-            let pub_key = PublicKey::from_secret_key(&secp, &input.key);
-            let sig = secp.sign(&message, &input.key);
+            let message = Message::from_digest_slice(&double_sha256(&pre_image_serialized)).unwrap();
+    
+            let sig = Secp256k1::signing_only().sign_ecdsa(&message, &input.key);
+    
             let mut sig_ser = sig.serialize_der().to_vec();
             sig_ser.push(sighash_type as u8);
+    
+            // Generate the public key from the secret key
+            let pub_key = PublicKey::from_secret_key(&secp, &input.key);
+            
             let script = input.output.sig_script(sig_ser, &pub_key, &pre_image, &self.outputs);
             tx_inputs.push(TxInput::new(input.outpoint.clone(), script, input.sequence));
         }
+    
         Tx::new(self.version, tx_inputs, self.outputs.clone(), self.lock_time)
     }
+    
 
     pub fn estimate_size(&self) -> u64 {
         use std::mem::{size_of_val};
