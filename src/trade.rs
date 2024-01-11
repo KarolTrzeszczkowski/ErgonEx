@@ -13,6 +13,8 @@ use std::collections::{HashMap, HashSet};
 use futures::stream::{self, StreamExt};
 use std::sync::{Arc, Mutex};
 use std::cmp::Ordering;
+use tokio::time::{sleep, Duration};
+
 
 
 
@@ -272,7 +274,7 @@ async fn confirm_trade_interactive(wallet: &Wallet,
 
     // Initialize the transaction builder and get the current wallet balance
     let (mut funding_tx_build, balance) = wallet.init_transaction(None, None).await?;
-    let refund_fees = 50;
+    let refund_fees = 142;
 
     // Now sender_address is an Address object
     let fund_output = P2PKHOutput {
@@ -309,7 +311,7 @@ async fn confirm_trade_interactive(wallet: &Wallet,
 
         println!("Let's send back the tokens to their owner");
 
-        let (mut refund_tx_build, balance) = wallet.init_transaction(Some(temp_address), Some(temp_secret_key)).await?;
+        let (mut refund_tx_build, balance) = wallet.init_transaction(Some(temp_address.clone()), Some(temp_secret_key)).await?;
 
         let mut token_id = [0; 32];
         token_id.copy_from_slice(&hex::decode(&res.token_id)?);
@@ -328,7 +330,7 @@ async fn confirm_trade_interactive(wallet: &Wallet,
 
         let mut output_back_to_wallet = P2PKHOutput {
             value: 0,  // for generating tx size
-            address: wallet.address().clone(),
+            address: temp_address.clone(),
         };
 
         // Now sender_address is an Address object
@@ -360,9 +362,11 @@ async fn confirm_trade_interactive(wallet: &Wallet,
     }
 
     println!("Deposit ok... Let's publish the sell offer on Ergon chain");
+    sleep(Duration::from_secs(1)).await;
 
-    let (mut listing_tx_build, _balance) = wallet.init_transaction(None, None).await?;
 
+    let (mut lock_tx_build, balance) = wallet.init_transaction(Some(temp_address.clone()), Some(temp_secret_key)).await?;
+    println!("Balance is: {}", balance);
 
     let output = EnforceOutputsOutput {
         value: 5,  // ignored for script hash generation
@@ -390,7 +394,6 @@ async fn confirm_trade_interactive(wallet: &Wallet,
     // Print the P2SH addresses
     println!("SLP Address: {}", addr_slp.cash_addr());
 
-    let (mut lock_tx_build, balance) = wallet.init_transaction(Some(temp_address.clone()), Some(temp_secret_key)).await?;
 
     let mut token_id = [0; 32];
     token_id.copy_from_slice(&hex::decode(&res.token_id)?);
@@ -417,6 +420,8 @@ async fn confirm_trade_interactive(wallet: &Wallet,
         address: wallet.address().clone(),
     };
 
+
+
     lock_tx_build.add_output(&output_slp);
     lock_tx_build.add_output(&send_output);
     lock_tx_build.add_output(&back_output);
@@ -426,10 +431,9 @@ async fn confirm_trade_interactive(wallet: &Wallet,
 
     let fee = 10;
     let total_spent =
-        output_slp.value() +
-            send_output.value() +
             back_output.value() +
             fee;
+    println!("Total about to be spent: {}", total_spent);
 
     output_back_to_wallet.value = balance - total_spent;
     lock_tx_build.replace_output(back_to_wallet_idx, &output_back_to_wallet);
@@ -437,6 +441,10 @@ async fn confirm_trade_interactive(wallet: &Wallet,
     
     let lock_result = wallet.send_tx(&lock_tx).await?;
     println!("Locking transaction sent with ID: {}", lock_result);
+
+
+    let (mut listing_tx_build, _balance) = wallet.init_transaction(None, None).await?;
+
 
     let trade_offer_output = TradeOfferOutput {
         tx_id: tx_hex_to_hash(&lock_result),
@@ -447,8 +455,9 @@ async fn confirm_trade_interactive(wallet: &Wallet,
         cancel_address: cancel_address.clone(),
     };
 
-    println!("TradeOfferOutput Details: tx_id: {:?}, output_idx: {}, sell_amount: {}, buy_amount: {}, receiving_address: {:?}, cancel_address: {:?}", 
-        trade_offer_output.tx_id, trade_offer_output.output_idx, trade_offer_output.sell_amount, trade_offer_output.buy_amount, trade_offer_output.receiving_address, trade_offer_output.cancel_address);
+    //println!("TradeOfferOutput Details: tx_id: {:?}, output_idx: {}, sell_amount: {}, buy_amount: {}, receiving_address: {:?}, cancel_address: {:?}", 
+        //trade_offer_output.tx_id, trade_offer_output.output_idx, trade_offer_output.sell_amount, trade_offer_output.buy_amount, trade_offer_output.receiving_address, trade_offer_output.cancel_address);
+    
 
     listing_tx_build.add_output(&trade_offer_output.into_output());
 

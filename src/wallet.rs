@@ -141,24 +141,32 @@ impl Wallet {
         Ok((tx_build, balance))
     }
     
+    
     pub async fn send_tx(&self, tx: &Tx) -> Result<String, Box<dyn std::error::Error>> {
         // Serialize the transaction
         let mut tx_ser = Vec::new();
         tx.write_to_stream(&mut tx_ser)?;
-
+    
         // Encode the serialized transaction in hexadecimal format
         let tx_hex = hex::encode(&tx_ser);
-
+    
         // Prepare the request payload for Chronik
         let raw_tx = hex::decode(&tx_hex).map_err(|e| e.to_string())?;
-
+    
         // Use the ChronikClient associated with the Wallet to broadcast the transaction
         let response = self.chronik_client.broadcast_tx(raw_tx).await?;
-
+    
         // Extract the transaction ID from the Chronik response
         let txid = response.txid;
+        // Reverse the bytes in place
+        let mut txid_rev = txid.clone();
+        txid_rev.reverse();
 
-        Ok(hex::encode(txid))
+        // Now encode the reversed bytes
+        let txid_hex = hex::encode(txid_rev);
+
+        Ok(txid_hex)
+
     }
     
     pub fn dust_amount(&self) -> u64 {

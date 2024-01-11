@@ -105,13 +105,12 @@ async fn do_transaction(w: &wallet::Wallet) -> Result<(), Box<dyn std::error::Er
         address: w.address().clone(),
     };
     let back_to_wallet_idx = tx_build.add_output(&output_back_to_wallet);
-    let estimated_size = tx_build.estimate_size();
-    let send_back_to_wallet_amount = if balance < send_amount + (estimated_size + 5) {
-        output_send.value = balance - (estimated_size + 5);
+    let send_back_to_wallet_amount = if balance < send_amount + 10 {
+        output_send.value = balance - 10;
         tx_build.replace_output(send_idx, &output_send);
         0
     } else {
-        balance - (send_amount + estimated_size + 5)
+        balance - (send_amount + 10)
     };
     if send_back_to_wallet_amount < w.dust_amount() {
         tx_build.remove_output(back_to_wallet_idx);
