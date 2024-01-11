@@ -274,6 +274,7 @@ async fn confirm_trade_interactive(wallet: &Wallet,
 
     // Initialize the transaction builder and get the current wallet balance
     let (mut funding_tx_build, balance) = wallet.init_transaction(None, None).await?;
+    //println!("Balance is: {}", balance);
     let refund_fees = 142;
 
     // Now sender_address is an Address object
@@ -296,6 +297,8 @@ async fn confirm_trade_interactive(wallet: &Wallet,
     let total_spent =
             fund_output.value() +
             fee;
+            
+    
 
     output_back_to_wallet.value = balance - total_spent;
     funding_tx_build.replace_output(back_to_wallet_idx, &output_back_to_wallet);
@@ -362,11 +365,11 @@ async fn confirm_trade_interactive(wallet: &Wallet,
     }
 
     println!("Deposit ok... Let's publish the sell offer on Ergon chain");
-    sleep(Duration::from_secs(1)).await;
+    sleep(Duration::from_secs(2)).await;
 
 
     let (mut lock_tx_build, balance) = wallet.init_transaction(Some(temp_address.clone()), Some(temp_secret_key)).await?;
-    println!("Balance is: {}", balance);
+    //println!("Temp wallet balance is: {}", balance);
 
     let output = EnforceOutputsOutput {
         value: 5,  // ignored for script hash generation
@@ -392,7 +395,7 @@ async fn confirm_trade_interactive(wallet: &Wallet,
     );
     
     // Print the P2SH addresses
-    println!("SLP Address: {}", addr_slp.cash_addr());
+    println!("P2SH Address: {}", addr_slp.cash_addr());
 
 
     let mut token_id = [0; 32];
@@ -433,7 +436,7 @@ async fn confirm_trade_interactive(wallet: &Wallet,
     let total_spent =
             back_output.value() +
             fee;
-    println!("Total about to be spent: {}", total_spent);
+    //println!("Total about to be spent: {}", total_spent);
 
     output_back_to_wallet.value = balance - total_spent;
     lock_tx_build.replace_output(back_to_wallet_idx, &output_back_to_wallet);
@@ -441,9 +444,13 @@ async fn confirm_trade_interactive(wallet: &Wallet,
     
     let lock_result = wallet.send_tx(&lock_tx).await?;
     println!("Locking transaction sent with ID: {}", lock_result);
+    sleep(Duration::from_secs(2)).await;
 
 
-    let (mut listing_tx_build, _balance) = wallet.init_transaction(None, None).await?;
+
+    let (mut listing_tx_build, balance) = wallet.init_transaction(None, None).await?;
+    //println!("Balance is: {}", balance);
+
 
 
     let trade_offer_output = TradeOfferOutput {
@@ -483,8 +490,12 @@ async fn confirm_trade_interactive(wallet: &Wallet,
     if total_spent > balance {
         println!("The broadcast transaction cannot be sent due to insufficient funds");
     }
+
+    //println!("Total about to be spent: {}", total_spent);
+
     send_output.value = balance - total_spent;
     listing_tx_build.add_output(&send_output);
+
 
     let listing_tx = listing_tx_build.sign();
     let result = wallet.send_tx(&listing_tx).await?;
