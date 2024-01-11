@@ -78,7 +78,7 @@ impl Wallet {
     pub async fn get_utxos(&self, address: &Address) -> Result<Vec<UtxoEntry>, Box<dyn std::error::Error>> {
         let client = reqwest::Client::new();
         let address_str = address.cash_addr(); // Use the cash_addr method
-        let url = format!("https://api.calory.money/api/utxos?address={}", address_str);
+        let url = format!("https://api.calory.money/utxos?address={}", address_str);
     
         let resp = client.get(&url).send().await?;
     
