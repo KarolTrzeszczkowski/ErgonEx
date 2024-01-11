@@ -104,7 +104,7 @@ async fn fetch_tokens(ids: &[&str]) -> Result<Vec<TokenEntry>, Box<dyn std::erro
     //println!("Received IDs: {:?}", ids);
 
     let query: Vec<_> = ids.iter().map(|id| ("tokenIds", id)).collect();
-    let url = reqwest::Url::parse_with_params("http://localhost:5000/api/tokens", &query)
+    let url = reqwest::Url::parse_with_params("https://api.calory.money/api/tokens", &query)
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
     reqwest::get(url).await?.json::<Vec<TokenEntry>>().await.map_err(|e| e.into())
@@ -265,7 +265,7 @@ async fn confirm_trade_interactive(wallet: &Wallet,
 
     // Make HTTP request to Flask server
     let client = reqwest::Client::new();
-    let slp_tx_route = format!("http://localhost:5000/api/parse_slp_tx?txid={}&vout={}", utxo.txid, utxo.vout);
+    let slp_tx_route = format!("https://api.calory.money/api/parse_slp_tx?txid={}&vout={}", utxo.txid, utxo.vout);
     let res = client.get(&slp_tx_route).send().await?.json::<SLPTxResponse>().await?;
 
     println!("Let's first fund the disposable wallet with some ergoshis for fees");
@@ -497,7 +497,7 @@ pub async fn accept_trades_interactive(wallet: &Wallet,  token_symbol: Option<St
               confirmed to show up due to bitdb)");
 
     let response = reqwest::get(
-        "http://localhost:5000/api/trades").await?;
+        "https://api.calory.money/api/trades").await?;
     let trades_result: TradesResult = response.json().await?;
 
 
@@ -572,7 +572,7 @@ pub async fn accept_trades_interactive(wallet: &Wallet,  token_symbol: Option<St
             let client = reqwest::Client::new();
             async move {
                 let futures = chunk.into_iter().map(|txid| {
-                    let url = format!("http://localhost:5000/api/validate_slp/{}", txid);
+                    let url = format!("https://api.calory.money/api/validate_slp/{}", txid);
                     client.get(&url).send()
                 });
 
@@ -622,7 +622,7 @@ pub async fn accept_trades_interactive(wallet: &Wallet,  token_symbol: Option<St
     let mut tx_details = Vec::new();
     for chunk in valid_txs.iter().collect::<Vec<_>>().chunks(20) {
         // Construct the URL with transaction IDs as parameters
-        let url = format!("http://localhost:5000/api/tx_details?{}", chunk.iter()
+        let url = format!("https://api.calory.money/api/tx_details?{}", chunk.iter()
             .map(|txid| format!("txid={}", txid))
             .collect::<Vec<String>>()
             .join("&"));
