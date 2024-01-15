@@ -1,5 +1,8 @@
 # Ergonex - An On-Chain Trading Terminal for Ergon
 
+![image](https://github.com/ErgonSurfer/ergon-slpagora/assets/153525861/0a5269d8-ea98-4143-936f-eb86362bcaeb)
+
+
 **Disclaimer: This is an experimental tool and is intended for educational purposes only. Use at your own risk. Loss of funds can occur due to bugs or misuse. The developers do not take any responsibility for financial losses.**
 
 ## Introduction
