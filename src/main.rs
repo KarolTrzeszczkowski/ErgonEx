@@ -12,11 +12,14 @@ pub mod address;
 pub mod outputs;
 pub mod wallet;
 pub mod trade;
+pub mod exch;
 pub mod display_qr;
 
 use std::io::{self, Write, Read};
 use text_io::{read};
 use std::env;
+use colored::*;
+
 
 
 const WALLET_FILE_NAME: &str = "trade.dat";
@@ -126,20 +129,33 @@ async fn do_transaction(w: &wallet::Wallet) -> Result<(), Box<dyn std::error::Er
 }
 
 #[tokio::main] // Make sure to use the async runtime
+
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let wallet = ensure_wallet_interactive()?;
-    println!("Your wallet address is: {}", wallet.address().cash_addr());
+
+    // ERGON ASCII Art
+    println!("{}", "
+    ███████╗██████╗ ███████╗ ██████╗ ███╗   ██╗ ███████╗██╗  ██╗
+    ██╔════╝██╔══██╗██╔════╝██╔═══██╗████╗  ██║ ██╔════╝╚██╗██╔╝
+    █████╗  ██████╔╝██ ████╗██║   ██║██╔██╗ ██║ █████╗   ╚███╔╝   
+    ██╔══╝  ██╔══██╗██   ██║██║   ██║██║╚██╗██║ ██╔══╝   ██╔██╗ 
+    ███████╗██║  ██║███████║╚██████╔╝██║ ╚████║ ███████╗██╔╝ ██╗
+    ╚══════╝╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═╝  ╚═══╝ ╚══════╝╚═╝  ╚═╝
+    ".bright_yellow().bold());
+    
+    println!("{}", "Your wallet address is:".bright_yellow().underline());
+    println!("{}", wallet.address().cash_addr().white());
 
     loop {
-        println!("---------------------------------");
-        println!("Select an option from below:");
-        println!("1: Show wallet balance / fund wallet");
-        println!("2: Send XRG from this wallet to an address");
-        println!("3: Create a new trade for a token on the Ergon blockchain");
-        println!("4: List all available token trades on the Ergon blockchain");
-        println!("5: List trades for a specific token symbol");
-        println!("Anything else: Exit");
-        print!("Your choice: ");
+        println!("{}", "---------------------------------".blue().bold());
+        println!("{}", "Select an option from below:".bright_green().bold());
+        println!("{}", "1: Show wallet balance / fund wallet".bright_cyan());
+        println!("{}", "2: Send XRG from this wallet to an address".bright_cyan());
+        println!("{}", "3: Create a new trade for a token on the Ergon blockchain".bright_cyan());
+        println!("{}", "4: List all available token trades on the Ergon blockchain".bright_cyan());
+        println!("{}", "5: List trades for a specific token symbol".bright_cyan());
+        println!("{}", "Anything else: Exit".bright_red());
+        print!("{}", "Your choice: ".bright_green());
         io::stdout().flush()?;
         let choice: String = read!("{}\n");
         match choice.trim() {
@@ -148,12 +164,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "3" => trade::create_trade_interactive(&wallet).await?,
             "4" => trade::accept_trades_interactive(&wallet, None).await?,
             "5" => {
-                println!("Enter the token symbol to filter trades: ");
+                println!("{}", "Enter the token symbol to filter trades: ".bright_magenta());
                 let token_symbol: String = read!("{}\n");
                 trade::accept_trades_interactive(&wallet, Some(token_symbol)).await?;
             },
             _ => {
-                println!("Bye, have a great time!");
+                println!("{}", "Bye, have a great time!".bright_green());
                 return Ok(());
             },
         }

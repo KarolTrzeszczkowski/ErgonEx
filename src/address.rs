@@ -150,6 +150,7 @@ impl Address {
             bytes,
         }
     }
+    
 
     pub fn from_bytes_prefix(prefix: &str, addr_type: AddressType, bytes: [u8; 20]) -> Self {
         Address {

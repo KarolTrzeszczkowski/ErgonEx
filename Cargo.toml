@@ -9,7 +9,7 @@ byteorder = "1.3.1"
 sha2 = "0.8.0"
 ripemd160 = "0.8.0"
 rand = "0.6.5"
-hex = "0.3.2"
+hex = "0.4"
 secp256k1 = { version = "0.28.1", features = ["recovery"] }
 bip32 = "0.5.1"
 bip39 = "2.0.0"
@@ -27,14 +27,14 @@ futures = "0.3"
 tokio = { version = "1.35.1", features = ["full"] } # Added for async runtime
 dirs = "1.0.5"
 qrcode = "0.10.0"
-colored = "1.7.0"
-prost = "0.10"
-prost-types = "0.10"
-bitcoinsuite_core = { git = "https://github.com/givelotus/bitcoinsuite.git", package = "bitcoinsuite-core" }
-bitcoinsuite_error = { git = "https://github.com/givelotus/bitcoinsuite.git", package = "bitcoinsuite-error" }
-bitcoinsuite_chronik_client = { git = "https://github.com/givelotus/bitcoinsuite.git", package = "bitcoinsuite-chronik-client" }
+colored = "2.1.0"
+prost = "0.11"
+prost-types = "0.11"
+bytes = "1.5.0"
+bitcoinsuite_core = { git = "https://github.com/givelotus/bitcoinsuite.git", package = "bitcoinsuite-core", rev = "dc6d80b" }
+bitcoinsuite_error = { git = "https://github.com/givelotus/bitcoinsuite.git", package = "bitcoinsuite-error", rev = "dc6d80b" }
+bitcoinsuite_chronik_client = { git= "https://github.com/givelotus/bitcoinsuite.git", package = "bitcoinsuite-chronik-client", rev = "dc6d80b" }
 thiserror = "1.0" # Use the correct version
 
 [build-dependencies]
-prost-build = "0.10"
-
+prost-build = "0.11"

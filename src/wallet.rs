@@ -1,36 +1,26 @@
 use crate::address::Address;
 use bitcoinsuite_chronik_client::ChronikClient;
-use serde::{Serialize, Deserialize};
+use bitcoinsuite_chronik_client::ScriptType;
+use bitcoinsuite_chronik_client::proto::{ScriptUtxos};
+use bitcoinsuite_chronik_client::proto::Tx as ProtoTx;
+use bitcoinsuite_core::Sha256d;
+use crate::address::AddressType;
 use crate::incomplete_tx::{IncompleteTx, Utxo};
-use crate::tx::{Tx, TxOutpoint, tx_hex_to_hash};
+use crate::tx::{Tx, TxOutpoint};
 use crate::outputs::{P2PKHOutput};
 use std::collections::HashSet;
+use std::error::Error;
 use rand::thread_rng;
+use reqwest::Client as ReqwestClient; 
 use rand::RngCore;
 use secp256k1::{Secp256k1, PublicKey, SecretKey};
 use hex;
-use reqwest;
-
 
 
 pub struct Wallet {
     secret_key: secp256k1::SecretKey,
     address: Address,
-    chronik_client: ChronikClient, // Add the ChronikClient as a member
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct UtxoEntry {
-    pub txid: String,
-    pub vout: u32,
-    pub amount: f64,
-    pub satoshis: u64,
-}
-
-
-#[derive(Deserialize, Serialize, Debug)]
-struct UtxoResult {
-    utxos: Vec<UtxoEntry>,
+    chronik_client: ChronikClient, 
 }
 
 impl Wallet {
@@ -46,7 +36,7 @@ impl Wallet {
         Ok(Wallet {
             secret_key,
             address: addr,
-            chronik_client, // Initialize the ChronikClient here
+            chronik_client, 
         })
     }
 
@@ -75,37 +65,85 @@ impl Wallet {
         Ok((address, secret_key))
     }
 
-    pub async fn get_utxos(&self, address: &Address) -> Result<Vec<UtxoEntry>, Box<dyn std::error::Error>> {
-        let client = reqwest::Client::new();
-        let address_str = address.cash_addr(); // Use the cash_addr method
-        let url = format!("https://api.calory.money/utxos?address={}", address_str);
-    
-        let resp = client.get(&url).send().await?;
-    
-        if resp.status().is_success() {
-            let utxos: Vec<UtxoEntry> = resp.json().await?;
-            Ok(utxos)
-        } else {
-            let error_message = resp.text().await?;
-            Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("Failed to fetch UTXOs: {}", error_message),
-            )))
+    #[allow(unreachable_patterns)]
+    pub async fn get_utxos(&self, address: &Address) -> Result<Vec<bitcoinsuite_chronik_client::proto::Utxo>, Box<dyn Error>> {
+   
+        let address_bytes = address.bytes();
+        //println!("Address Bytes: {:?}", address_bytes);
+        let script_type = match address.addr_type() {
+            AddressType::P2PKH => ScriptType::P2pkh,
+            AddressType::P2SH => ScriptType::P2sh,
+            _ => return Err("Unsupported address type".into()),
+        };
+        let script_payload = hex::encode(&address_bytes);
+        //println!("Payload Used: {:?}", script_payload);
+        let script_endpoint = format!("script/{}/{}/utxos", script_type, script_payload);
+        //println!("script_endpoint: {:?}", script_endpoint);
+        // Create a reqwest client
+        let client = ReqwestClient::new();
+        let chronik_url = "https://chronik.be.cash/xrg";
+        // Concatenate the base URL and the script endpoint to form the complete URL
+        let full_url = format!("{}/{}", chronik_url, script_endpoint);
+        //println!("full_url: {:?}", full_url);
+        // Make a GET request to the complete URL
+        let response = client.get(&full_url).send().await?;
+        //println!("response: {:?}", response);
+        // Check if the response status code is 200 OK
+        if response.status() != reqwest::StatusCode::OK {
+            return Err(format!("Error: {}", response.status()).into());
         }
+        // Parse the response body as bytes
+        let response_bytes = response.bytes().await?;
+        //println!("response_bytes: {:?}", response_bytes);
+        // Deserialize the response bytes into ScriptUtxos
+        let utxos_response: ScriptUtxos = prost::Message::decode(&response_bytes[..])?;
+        //println!("utxos_response: {:?}", utxos_response);
+        // Access the serialized script
+        let script_bytes: &[u8] = &utxos_response.output_script;
+        //println!("script_bytes: {:?}", script_bytes);
+        // Deserialize the byte array into a ScriptUtxos message
+        let script_utxos: ScriptUtxos = prost::Message::decode(script_bytes).unwrap();
+        //println!("script_utxos: {:?}", script_utxos);
+        // Access the list of ScriptUtxo messages from script_utxos
+        let utxos: Vec<bitcoinsuite_chronik_client::proto::Utxo> = script_utxos.utxos;
+        //println!("utxos: {:?}", utxos);
+
+        Ok(utxos)
     }
     
-
+    
     pub async fn get_balance(&self) -> Result<u64, Box<dyn std::error::Error>> {
         let utxos = self.get_utxos(&self.address).await?;
-        Ok(utxos.iter().map(|utxo| utxo.satoshis).sum())
+        Ok(utxos.iter().map(|utxo| utxo.value as u64).sum())
     }
     
+    pub async fn get_transaction_details(&self, txid: &Sha256d) -> Result<ProtoTx, Box<dyn Error>> {
+        let transaction_details = self.chronik_client.tx(txid).await?;
+        //println!("Transaction Details: {:?}", transaction_details);
+        Ok(transaction_details)
+    }
 
-    pub async fn wait_for_transaction(&self, address: &Address, already_existing: &HashSet<String>) -> Result<UtxoEntry, Box<dyn std::error::Error>> {
+    pub async fn fetch_token(&self, token_id: &Sha256d) -> Result<bitcoinsuite_chronik_client::proto::Token, Box<dyn std::error::Error>> {
+        let token_info = self.chronik_client.token(token_id).await?;
+        println!("Token Info: {:?}", token_info);
+        Ok(token_info)
+    }
+
+    pub async fn wait_for_transaction(
+        &self, 
+        address: &Address, 
+        already_existing: &HashSet<Vec<u8>>) -> Result<bitcoinsuite_chronik_client::proto::Utxo, Box<dyn std::error::Error>> 
+    {
         loop {
             let utxos = self.get_utxos(address).await?;
             let mut remaining = utxos.into_iter()
-                .filter(|utxo| !already_existing.contains(&utxo.txid))
+                .filter(|utxo| {
+                    if let Some(ref outpoint) = utxo.outpoint {
+                        !already_existing.contains(&outpoint.txid)
+                    } else {
+                        false
+                    }
+                })
                 .collect::<Vec<_>>();
             if !remaining.is_empty() {
                 return Ok(remaining.remove(0));
@@ -113,6 +151,7 @@ impl Wallet {
             tokio::time::sleep(std::time::Duration::new(1, 0)).await;
         }
     }
+    
 
     pub async fn init_transaction(&self, temp_address: Option<Address>, temp_secret_key: Option<SecretKey>) -> Result<(IncompleteTx, u64), Box<dyn std::error::Error>> {
         let address_to_use = temp_address.unwrap_or_else(|| self.address.clone());
@@ -123,16 +162,36 @@ impl Wallet {
         let utxos = self.get_utxos(&address_to_use).await?;
     
         for utxo in utxos.iter() {
-            balance += utxo.satoshis;
+            balance += utxo.value as u64;
+    
+            let tx_hash_bytes = match utxo.outpoint.as_ref() {
+                Some(outpoint) => outpoint.txid.clone(),
+                None => return Err("Outpoint is None".into()),
+            };
+    
+            // Ensure the length is 32 and convert to array
+            let tx_hash_array = if tx_hash_bytes.len() == 32 {
+                let mut array = [0u8; 32];
+                array.copy_from_slice(&tx_hash_bytes);
+                array
+            } else {
+                return Err("Invalid tx_hash_bytes length".into());
+            };
+    
+            let output_idx = match utxo.outpoint.as_ref() {
+                Some(outpoint) => outpoint.out_idx,
+                None => return Err("Outpoint is None".into()),
+            };
+    
             tx_build.add_utxo(Utxo {
                 key: key_to_use.clone(),
                 output: Box::new(P2PKHOutput {
                     address: address_to_use.clone(),
-                    value: utxo.satoshis,
+                    value: utxo.value as u64,
                 }),
                 outpoint: TxOutpoint {
-                    tx_hash: tx_hex_to_hash(&utxo.txid),
-                    output_idx: utxo.vout,
+                    tx_hash: tx_hash_array, // Use the array here
+                    output_idx: output_idx,
                 },
                 sequence: 0xffff_ffff,
             });
@@ -141,7 +200,6 @@ impl Wallet {
         Ok((tx_build, balance))
     }
     
-    
     pub async fn send_tx(&self, tx: &Tx) -> Result<String, Box<dyn std::error::Error>> {
         // Serialize the transaction
         let mut tx_ser = Vec::new();
@@ -149,9 +207,12 @@ impl Wallet {
     
         // Encode the serialized transaction in hexadecimal format
         let tx_hex = hex::encode(&tx_ser);
+        //println!("Raw tx: {:?}", tx_hex);
+
     
         // Prepare the request payload for Chronik
         let raw_tx = hex::decode(&tx_hex).map_err(|e| e.to_string())?;
+
     
         // Use the ChronikClient associated with the Wallet to broadcast the transaction
         let response = self.chronik_client.broadcast_tx(raw_tx).await?;

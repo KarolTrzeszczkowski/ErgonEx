@@ -1,6 +1,5 @@
 use crate::serialize::write_var_int;
 use crate::script::Script;
-
 use std::io;
 use byteorder::{LittleEndian, WriteBytesExt};
 
@@ -32,10 +31,26 @@ pub struct Tx {
     lock_time: u32,
 }
 
-pub fn tx_hex_to_hash(s: &str) -> [u8; 32] {
+pub fn tx_hex_to_hash(bytes: &[u8]) -> String {
     let mut tx_hash = [0; 32];
-    tx_hash.copy_from_slice(&hex::decode(s).unwrap().iter().rev().cloned().collect::<Vec<_>>());
-    tx_hash
+
+    // Ensure the input bytes are of the expected length (32 bytes).
+    if bytes.len() == 32 {
+        // Copy the bytes into tx_hash and reverse them to handle endianness.
+        tx_hash.copy_from_slice(bytes);
+
+        // Convert the byte array to a hexadecimal string
+        let hex_string = hex::encode(tx_hash);
+
+        // Print the input and output for debugging
+        //println!("Input bytes: {:?}", bytes);
+        //println!("Tx hash: {:?}", hex_string);
+
+        hex_string
+    } else {
+        // Handle error for unexpected length. You can return an error or panic.
+        panic!("Expected 32-byte input for tx_hex_to_hash");
+    }
 }
 
 impl TxInput {
@@ -99,5 +114,6 @@ impl Tx {
 
     pub fn outputs(&self) -> &[TxOutput] {
         &self.outputs
-    }
+    }   
+        
 }
